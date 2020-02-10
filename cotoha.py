@@ -78,14 +78,17 @@ class Cotoha():
                     type_adjective = "weak"
                     dependency_labels = token["dependency_labels"]
                 
-                    
-        return type_adjective, dependency_labels[0]
+        if not len(dependency_labels) == 0:
+            return type_adjective, dependency_labels[0]
+        else:
+            return type_adjective, {}
     
-    def get_poke_type(self, json_response, token_id):
+    def get_poke_type(self, json_response, token_id, poke_types):
         for chunk in json_response:
             for token in chunk["tokens"]:
                 if token["id"] == token_id:
-                    return token["lemma"]
+
+                    return poke_types.index(token["form"])
         
         
 
@@ -146,13 +149,16 @@ if(__name__=="__main__"):
     # sent = "火で強いタイプ"
     # parse_text = cotoha.parse(sent)
     # print(parse_text)
-    sent = "ほのおにバツグン"
+    sent = "はがねが有利"
     parse_text = cotoha.parse(sent)
     print(parse_text)
 
     adjective, dependency_labels = cotoha.get_adjective(parse_text)
-    poke_type = cotoha.get_poke_type(parse_text, dependency_labels['token_id'])
-    print(poke_type)
+    if (dependency_labels == {}):
+        exit()
+    
+    type_id = cotoha.get_poke_type(parse_text, dependency_labels['token_id'], poke_types)
+    print("対象タイプ："+str(type_id))
 
     # 強弱判定
     if adjective == "strong":
@@ -169,18 +175,15 @@ if(__name__=="__main__"):
     if dependency_labels["label"] == "nsubj":
         #table_axis = "horizontal"
         depend_text = "が"
-        answers = [poke_types[i] for i, x in enumerate(TPYE_TABLE[1]) if x==target]
+        answers = [poke_types[i] for i, x in enumerate(TPYE_TABLE[type_id]) if x==target]
         pass
-    elif dependency_labels["label"] == "iobj":
+    elif dependency_labels["label"] == "iobj" or "dobj":
         #table_axis = "vertical"
         depend_text = "に"
-        answers = [poke_types[i] for i, x in enumerate(TPYE_TABLE) if x[1]==target]
-
+        answers = [poke_types[i] for i, x in enumerate(TPYE_TABLE) if x[type_id]==target]
 
     
-    #answers = [poke_types[i] for i, x in enumerate(l) if x==target]
-    
-    response = "ほのおタイプ" + depend_text + strong_text + "のは" + 'と'.join(answers) + "タイプじゃな！"
+    response = poke_types[type_id] + "タイプ" + depend_text + strong_text + "のは" + 'と'.join(answers) + "タイプじゃな！"
     print(response)
 
     
