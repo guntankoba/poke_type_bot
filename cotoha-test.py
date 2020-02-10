@@ -1,3 +1,4 @@
+import configparser
 import discord
 import cotoha as cth
 client = discord.Client()
@@ -58,7 +59,11 @@ async def on_message(message):
 
     if message.content.startswith('火にバツグン'):
         await message.channel.send(get_weak_point())
-client.run('Njc2NDA0NzgyOTk4NzQ5MjE0.XkFN9w.FWGiWunOntSC_z6RbHCv7xwOgqU')
+
+config_ini = configparser.ConfigParser()
+config_ini.read('config.ini', encoding='utf-8')
+TOKEN = config_ini['DISCORD']['Token']
+client.run(TOKEN)
 
 
 
