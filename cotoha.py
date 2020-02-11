@@ -84,11 +84,16 @@ class Cotoha():
             return type_adjective, {}
     
     def get_poke_type(self, json_response, token_id, poke_types):
+        poke_type = None
         for chunk in json_response:
             for token in chunk["tokens"]:
                 if token["id"] == token_id:
-
-                    return poke_types.index(token["form"])
+                    try:
+                        poke_type = poke_types.index(token["form"])
+                    except:
+                        poke_type = None
+                
+                return poke_type
         
         
 
