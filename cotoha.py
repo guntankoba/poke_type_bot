@@ -40,12 +40,32 @@ class Cotoha():
             "sentence": sentence,
             "type": "default"
         }
-        r = requests.post(
-            self.BASE_URL + "v1/parse",
-            headers=headers,
-            data=json.dumps(data)
-        )
+        try:
+            r = requests.post(
+                self.BASE_URL + "v1/parse",
+                headers=headers,
+                data=json.dumps(data)
+            )
+        except:
+            if r.status_code == 401:
+                self.access_token = self.get_access_token(self._CLIENT_ID, self._CLIENT_SECRET)
+                headers["Authorization"] = "Bearer " + self.access_token
+                r = requests.post(
+                    self.BASE_URL + "v1/parse",
+                    headers=headers,
+                    data=json.dumps(data)
+                )
+
         return r.json()["result"]
+
+    def get_tokens(self, chunks):
+        tokens = []
+        for c in chunks:
+            for token in c["tokens"]:
+                tokens.append(token)
+        print(len(tokens))
+
+        return tokens
 
     def get_type(self):
         """
@@ -61,40 +81,30 @@ class Cotoha():
                     pos_list.append(token["lemma"])
         return pos_list
 
-    def get_adjective(self, json_response):
+    def get_adjective(self, tokens):
         strongs = {"強い", "有利", "優勢", "抜群"}
         weaks = {"弱い", "不利", "劣勢", "今一つ"}
+        invalid = {"無効", "効かない", "当たらない"}
+
         type_adjective = "normal"
         dependency_labels = []
-        for chunk in json_response:
-            for token in chunk["tokens"]:
-                print(token["lemma"])
-                if token["lemma"] in strongs:
-                    print("強い")
-                    type_adjective = "strong"
-                    dependency_labels = token["dependency_labels"]
-                elif token["lemma"] in weaks:
-                    print("弱い")
-                    type_adjective = "weak"
-                    dependency_labels = token["dependency_labels"]
-                
+        for token in tokens:          
+            if token["lemma"] in strongs:
+                type_adjective = "strong"
+                dependency_labels = token["dependency_labels"]
+            elif token["lemma"] in weaks:
+                type_adjective = "weak"
+                dependency_labels = token["dependency_labels"]
+            elif token["lemma"] in invalid:
+                type_adjective = "invalid"
+                dependency_labels = token["dependency_labels"]
+        print("debug")
         if not len(dependency_labels) == 0:
             return type_adjective, dependency_labels[0]
         else:
             return type_adjective, {}
     
-    def get_poke_type(self, json_response, token_id, poke_types):
-        poke_type = None
-        for chunk in json_response:
-            for token in chunk["tokens"]:
-                if token["id"] == token_id:
-                    try:
-                        poke_type = poke_types.index(token["form"])
-                    except:
-                        poke_type = None
-                
-                return poke_type
-        
+
         
 
 """
@@ -143,18 +153,7 @@ if(__name__=="__main__"):
         [1,2,1,1,1,1,0,2,1,1,1,1,1,1,0,0,2,1]  # フェアリー
     ]
 
-    weaks_list_fire = [1,2,0,1,2,2,1,1,0,1,1,2,0,1,1,1,2,2]
-    strongs_list_fire = []
-    # sent = "火に強いタイプ"
-    # parse_text = cotoha.parse(sent)
-    # print(parse_text)
-    # sent = "火が強いタイプ"
-    # parse_text = cotoha.parse(sent)
-    # print(parse_text)
-    # sent = "火で強いタイプ"
-    # parse_text = cotoha.parse(sent)
-    # print(parse_text)
-    sent = "はがねが有利"
+    sent = "かくとうが無効"
     parse_text = cotoha.parse(sent)
     print(parse_text)
 
@@ -163,32 +162,38 @@ if(__name__=="__main__"):
         exit()
     
     type_id = cotoha.get_poke_type(parse_text, dependency_labels['token_id'], poke_types)
-    print("対象タイプ："+str(type_id))
-
+    print("対象タイプ：" + str(type_id))
+    print("依存関係ラベル："+ dependency_labels["label"])
     # 強弱判定
     if adjective == "strong":
         target = 0
-        strong_text = "強い"
-    elif adjective == "weaks":
+        strong_text = "バツグンな"
+    elif adjective == "weak":
         target = 2
-        strong_text = "弱い"
+        strong_text = "いまひとつな"
+    elif adjective == "invalid":
+        target = 3
+        strong_text = "効果なしの"
     else:
         target = 1
         strong_text = "普通な"
     
     # 係り受け判定
-    if dependency_labels["label"] == "nsubj":
+    if (dependency_labels["label"] == "nsubj") or (dependency_labels["label"] == "nmod"):
+        print('ggg')
         #table_axis = "horizontal"
-        depend_text = "が"
         answers = [poke_types[i] for i, x in enumerate(TPYE_TABLE[type_id]) if x==target]
-        pass
-    elif dependency_labels["label"] == "iobj" or "dobj":
-        #table_axis = "vertical"
-        depend_text = "に"
-        answers = [poke_types[i] for i, x in enumerate(TPYE_TABLE) if x[type_id]==target]
+        response = poke_types[type_id] + "タイプ技が" + strong_text + "ポケモンは、" + 'と'.join(answers) + "タイプじゃな！"
 
+    elif (dependency_labels["label"] == "iobj") or (dependency_labels["label"] == "dobj"):
+        print('nnn')
+        #table_axis = "vertical"
+        answers = [poke_types[i] for i, x in enumerate(TPYE_TABLE) if x[type_id]==target]
+        response = poke_types[type_id] + "タイプポケモンに" + strong_text + "わざは、" + '、'.join(answers) + "タイプじゃな！"
     
-    response = poke_types[type_id] + "タイプ" + depend_text + strong_text + "のは" + 'と'.join(answers) + "タイプじゃな！"
+    else:
+        response = "eee"
+    # response = poke_types[type_id] + "タイプ" + depend_text + strong_text + "のは" + 'と'.join(answers) + "タイプじゃな！"
     print(response)
 
     
